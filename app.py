@@ -172,33 +172,48 @@ def generate_image(
         print(f"Arguments: {str({k: v for k, v in args.items() if k != 'image_base64'})}")  # Don't print base64 string
         
         progress(0.1, desc="Sending request to Together AI")
-        print(f"Requesting {num_outputs} images...")
-        response = client.images.generate(**args)
-        print(f"Response received. Data length: {len(response.data) if hasattr(response, 'data') and response.data else 'No data'}")
-        progress(0.5, desc="Processing response")
-
+        
+        # Workaround for the Together API limitation:
+        # It seems the API only returns one image regardless of the 'n' parameter
+        # So we'll make multiple individual requests instead
+        original_n = args["n"]
+        args["n"] = 1  # Set to 1 for individual requests
+        
         images = []
-        if response and response.data:
-            total = len(response.data)
-            for i, image_data in enumerate(response.data):
-                progress((0.5 + ((i+1) / total * 0.5)), desc=f"Processing image {i+1} of {total}")
-                 
-                # First try b64_json for direct data
-                if hasattr(image_data, 'b64_json') and image_data.b64_json:
-                    img_bytes = base64.b64decode(image_data.b64_json)
-                    img = Image.open(io.BytesIO(img_bytes))
-                    images.append(img)
+        for req_idx in range(original_n):
+            progress_val = 0.1 + (req_idx / original_n * 0.4)
+            progress(progress_val, desc=f"Generating image {req_idx+1} of {original_n}")
+            print(f"Requesting image {req_idx+1} of {original_n}...")
+            
+            # Use a different seed for each image if the original seed wasn't specified
+            if seed == -1 and req_idx > 0:
+                args["seed"] = random.randint(1, 1000000)
                 
-                # Fall back to URL if b64_json isn't available
-                elif hasattr(image_data, 'url') and image_data.url:
-                    try:
-                        img = url_to_pil(image_data.url)
+            response = client.images.generate(**args)
+            print(f"Response received. Data length: {len(response.data) if hasattr(response, 'data') and response.data else 'No data'}")
+            
+            if response and response.data:
+                # Process the response data for each API call
+                for i, image_data in enumerate(response.data):
+                    progress_val = 0.5 + (req_idx / original_n * 0.5)
+                    progress(progress_val, desc=f"Processing image {req_idx+1} of {original_n}")
+                     
+                    # First try b64_json for direct data
+                    if hasattr(image_data, 'b64_json') and image_data.b64_json:
+                        img_bytes = base64.b64decode(image_data.b64_json)
+                        img = Image.open(io.BytesIO(img_bytes))
                         images.append(img)
-                    except Exception as url_error:
-                        print(f"Failed to fetch image from URL: {url_error}")
-                        # Continue to the next image rather than failing completely
-                else:
-                    print(f"Warning: No image data found for result {i}")
+                    
+                    # Fall back to URL if b64_json isn't available
+                    elif hasattr(image_data, 'url') and image_data.url:
+                        try:
+                            img = url_to_pil(image_data.url)
+                            images.append(img)
+                        except Exception as url_error:
+                            print(f"Failed to fetch image from URL: {url_error}")
+                            # Continue to the next image rather than failing completely
+                    else:
+                        print(f"Warning: No image data found for result {i}")
             
         if not images:
             raise gr.Error("No images were returned from the API", title="Generation Failed")
