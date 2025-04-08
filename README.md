@@ -5,7 +5,7 @@ colorFrom: blue
 colorTo: indigo
 sdk: gradio
 sdk_version: 4.19.2 # Specify a recent Gradio version, adjust if needed
-python_version: 3.10 # Specify Python version
+python_version: 3.9 # Specify Python version
 app_file: app.py
 pinned: false
 license: mit # Or apache-2.0, choose an appropriate license
