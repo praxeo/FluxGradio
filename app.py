@@ -8,6 +8,7 @@ import requests
 from PIL import Image
 import datetime
 import random
+from typing import Optional
 
 # --- Configuration ---
 # Initialize the Together client
@@ -104,7 +105,7 @@ def generate_image(
     width: int,
     height: int,
     num_outputs: int,
-    input_image: Image.Image | None,
+    input_image: Optional[Image.Image],
     image_url: str,
     disable_safety: bool,
     progress=gr.Progress(track_tqdm=True)
