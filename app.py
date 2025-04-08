@@ -172,7 +172,9 @@ def generate_image(
         print(f"Arguments: {str({k: v for k, v in args.items() if k != 'image_base64'})}")  # Don't print base64 string
         
         progress(0.1, desc="Sending request to Together AI")
+        print(f"Requesting {num_outputs} images...")
         response = client.images.generate(**args)
+        print(f"Response received. Data length: {len(response.data) if hasattr(response, 'data') and response.data else 'No data'}")
         progress(0.5, desc="Processing response")
 
         images = []
