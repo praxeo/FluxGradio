@@ -2,7 +2,7 @@
 title: Flux Image Generator
 emoji: 🖼️
 colorFrom: blue
-colorTo: sky
+colorTo: indigo
 sdk: gradio
 sdk_version: 4.19.2 # Specify a recent Gradio version, adjust if needed
 python_version: 3.10 # Specify Python version
