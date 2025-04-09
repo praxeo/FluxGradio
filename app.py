@@ -168,13 +168,16 @@ def generate_image(
     if processed_image is not None:
         try:
             base64_img = pil_to_base64(processed_image)
-            # For FLUX.1-redux and other image-to-image models, need to ensure 
-            # the image is properly formatted in the API request
+            # For image-to-image models, we need to use a specific parameter format
+            # The API seems to expect "image_url" with a "url" property
             if model_name in IMAGE_INPUT_MODELS:
-                args["image_base64"] = base64_img
-                # Debug image data
+                # The error message suggests 'image_url.url' is expected
+                args["image_url"] = {"url": f"data:image/png;base64,{base64_img}"}
+                # Add debugging info
                 print(f"Adding image data for {model_name}, image size: {processed_image.size}")
+                print(f"Using 'image_url' parameter for image-to-image model with data URI")
             else:
+                # For text-to-image models, use standard image_base64
                 args["image_base64"] = base64_img
         except Exception as e:
             print(f"Error encoding image: {str(e)}")
