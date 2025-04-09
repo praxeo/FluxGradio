@@ -168,14 +168,32 @@ def generate_image(
     if processed_image is not None:
         try:
             base64_img = pil_to_base64(processed_image)
-            # For image-to-image models, we need to use a specific parameter format
-            # The API seems to expect "image_url" with a "url" property
+            # Try different approaches for image-to-image models
             if model_name in IMAGE_INPUT_MODELS:
-                # The error message suggests 'image_url.url' is expected
-                args["image_url"] = {"url": f"data:image/png;base64,{base64_img}"}
-                # Add debugging info
+                # Approach 1: Try with standard file object to let the SDK handle the conversion
+                # Save the image to a temporary buffer
+                buffered = io.BytesIO()
+                processed_image.save(buffered, format="PNG")
+                buffered.seek(0)
+                
+                # Let the Together SDK handle the file upload
+                args["input_image"] = buffered
+                
+                # Log what we're doing for debugging
                 print(f"Adding image data for {model_name}, image size: {processed_image.size}")
-                print(f"Using 'image_url' parameter for image-to-image model with data URI")
+                print(f"Using 'input_image' parameter with file buffer")
+                
+                # Resize the image if it's too large (some APIs have size limits)
+                if processed_image.width > 1024 or processed_image.height > 1024:
+                    aspect_ratio = processed_image.width / processed_image.height
+                    if processed_image.width > processed_image.height:
+                        new_width = 1024
+                        new_height = int(new_width / aspect_ratio)
+                    else:
+                        new_height = 1024
+                        new_width = int(new_height * aspect_ratio)
+                    processed_image = processed_image.resize((new_width, new_height))
+                    print(f"Resized image to {new_width}x{new_height} for API compatibility")
             else:
                 # For text-to-image models, use standard image_base64
                 args["image_base64"] = base64_img
