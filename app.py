@@ -43,12 +43,42 @@ IMAGE_INPUT_MODELS = [
 
 # List of available models with descriptions
 MODEL_INFO = {
-    "black-forest-labs/FLUX.1.1-pro": {"description": "Premium high-quality generation model"},
-    "black-forest-labs/FLUX.1-schnell": {"description": "Fast generation model with good quality"}, 
-    "black-forest-labs/FLUX.1-dev": {"description": "Development model, well-balanced"},
-    "black-forest-labs/FLUX.1-canny": {"description": "Uses edge detection for precise composition control"},
-    "black-forest-labs/FLUX.1-depth": {"description": "Uses depth maps for accurate spatial relationships"},
-    "black-forest-labs/FLUX.1-redux": {"description": "Creates variations of input images"}
+    "black-forest-labs/FLUX.1.1-pro": {
+        "description": "Premium high-quality generation model for photorealistic and artistic images",
+        "details": """FLUX.1.1-Pro is Black Forest Labs' flagship model, designed for maximum image quality and detail. 
+        It excels at photorealism, complex scenes, and accurate representations of subjects. Best for portfolio-quality 
+        images when quality is more important than generation speed. Supports up to 50 inference steps."""
+    },
+    "black-forest-labs/FLUX.1-schnell": {
+        "description": "Fast generation model with good quality - ideal for rapid iterations",
+        "details": """FLUX.1-Schnell (German for 'fast') is optimized for speed while maintaining respectable image quality. 
+        It's perfect for quickly testing concepts or when you need multiple variations in less time. Limited to a maximum of 
+        12 inference steps, it generates images significantly faster than other models in the FLUX family."""
+    }, 
+    "black-forest-labs/FLUX.1-dev": {
+        "description": "Development model offering a well-balanced mix of quality and speed",
+        "details": """FLUX.1-Dev provides a middle ground between the Pro and Schnell models. It offers a good balance of 
+        generation quality and speed, making it suitable for everyday use and development work. It handles a wide range of 
+        prompts reliably and supports safety filter disabling for artistic freedom."""
+    },
+    "black-forest-labs/FLUX.1-canny": {
+        "description": "Uses edge detection for precise composition and structure control",
+        "details": """FLUX.1-Canny is an image-to-image model that preserves the structural outlines of your reference image. 
+        It works by detecting edges in your uploaded image and using them as a skeleton for the new creation. Perfect for 
+        maintaining exact poses, compositions, or converting sketches and line drawings into fully rendered images."""
+    },
+    "black-forest-labs/FLUX.1-depth": {
+        "description": "Uses depth maps for accurate spatial relationships and 3D consistency",
+        "details": """FLUX.1-Depth extracts depth information from your reference image to maintain the spatial layout and 
+        perspective in the generated image. It's ideal for preserving the 3D structure of scenes while changing their style, 
+        materials, or theme. Excellent for architectural visualization, interior design transformations, or landscape restyling."""
+    },
+    "black-forest-labs/FLUX.1-redux": {
+        "description": "Creates variations of input images while maintaining core elements",
+        "details": """FLUX.1-Redux specializes in creating alternative interpretations of your reference images. It maintains 
+        the essential elements and composition while allowing for creative reinterpretation based on your prompt. Perfect for 
+        exploring different artistic styles, lighting conditions, or mood variations of an existing image."""
+    }
 }
 
 # Extract just the model IDs for the dropdown
@@ -279,7 +309,7 @@ def generate_image(
             raise gr.Error(f"Failed to generate image: {error_message}")
 
 def suggest_prompt(theme: str):
-    """Generates a prompt suggestion using Llama 4 Maverick."""
+    """Generates a prompt suggestion using DeepSeek V3."""
     if not client:
         raise gr.Error("Together AI client not initialized. Check API Key.")
     if not theme:
@@ -288,13 +318,13 @@ def suggest_prompt(theme: str):
     print(f"Suggesting prompt for theme: {theme}")
     try:
         response = client.chat.completions.create(
-            model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+            model="deepseek-ai/DeepSeek-V3",
             messages=[
                 {"role": "system", "content": "You are an expert at creating stunning, evocative image generation prompts. Your specialty is crafting prompts that produce vivid, beautiful, and compelling images when fed to AI image generators. Focus on visual elements: subjects, lighting, colors, mood, composition, style, and artistic influences. Be creative, detailed, and articulate. Your prompts should paint a clear picture in the reader's mind."},
                 {"role": "user", "content": f"Create a detailed, artistic prompt for an AI image generator based on this theme: {theme}. Include visual details, style references, lighting, and composition guidance."}
             ],
-            max_tokens=200, # Increased token limit for more detailed prompts
-            temperature=0.9, # Slightly higher temperature for more creative outputs
+            max_tokens=300, # Increased token limit for more detailed prompts
+            temperature=0.8, # Slightly reduced for more focused creativity
         )
         suggestion = response.choices[0].message.content.strip()
         print(f"Generated suggestion: {suggestion}")
@@ -447,7 +477,7 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
                 )
             
             # Prompt Helper section
-            with gr.Accordion("Prompt Helper (Llama 4 Maverick)", open=False):
+            with gr.Accordion("Prompt Helper (DeepSeek V3)", open=False):
                 prompt_theme_input = gr.Textbox(
                     label="Prompt Idea/Theme", 
                     placeholder="e.g., 'cyberpunk cat cafe', 'underwater city', 'desert oasis'"
@@ -475,6 +505,10 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
                 model_info = gr.Markdown(
                     MODEL_INFO[AVAILABLE_MODELS[0]]["description"],
                     elem_classes="model-info" 
+                )
+                model_details = gr.Markdown(
+                    MODEL_INFO[AVAILABLE_MODELS[0]]["details"],
+                    elem_classes="guide-content" 
                 )
             
             # Image Input section
@@ -553,13 +587,13 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
     def update_model_info(model_name):
         """Updates the model information based on selection."""
         if model_name in MODEL_INFO:
-            return MODEL_INFO[model_name]["description"]
-        return ""
+            return MODEL_INFO[model_name]["description"], MODEL_INFO[model_name]["details"]
+        return "", ""
     
     model_selector.change(
         fn=update_model_info,
         inputs=[model_selector],
-        outputs=[model_info]
+        outputs=[model_info, model_details]
     )
     
     # Update steps slider based on model selection
@@ -618,7 +652,7 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
         return ""
         
     # Add button to use the suggested prompt
-    with gr.Accordion("Prompt Helper (Llama 4 Maverick)", open=False) as prompt_helper:
+    with gr.Accordion("Prompt Helper (DeepSeek V3)", open=False) as prompt_helper:
         use_suggestion_btn = gr.Button("Use This Suggestion", variant="secondary", size="sm")
         
     use_suggestion_btn.click(
