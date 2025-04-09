@@ -167,7 +167,15 @@ def generate_image(
     # Add image data if available
     if processed_image is not None:
         try:
-            args["image_base64"] = pil_to_base64(processed_image)
+            base64_img = pil_to_base64(processed_image)
+            # For FLUX.1-redux and other image-to-image models, need to ensure 
+            # the image is properly formatted in the API request
+            if model_name in IMAGE_INPUT_MODELS:
+                args["image_base64"] = base64_img
+                # Debug image data
+                print(f"Adding image data for {model_name}, image size: {processed_image.size}")
+            else:
+                args["image_base64"] = base64_img
         except Exception as e:
             print(f"Error encoding image: {str(e)}")
             raise gr.Error(f"Error encoding image: {str(e)}")
