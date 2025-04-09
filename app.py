@@ -27,6 +27,13 @@ MODELS_NO_SAFETY_DISABLE = [
     "black-forest-labs/FLUX.1.1-pro"
 ]
 
+# Model-specific constraints
+MODEL_CONSTRAINTS = {
+    "black-forest-labs/FLUX.1-schnell": {
+        "max_steps": 12
+    }
+}
+
 # Models that typically expect an input image
 IMAGE_INPUT_MODELS = [
     "black-forest-labs/FLUX.1-canny",
@@ -112,9 +119,9 @@ def generate_image(
 ):
     """Generates images using the Together AI API."""
     if not client:
-        raise gr.Error("Together AI client not initialized. Check API Key.", title="Authentication Error")
+        raise gr.Error("Together AI client not initialized. Check API Key.")
     if not prompt:
-        raise gr.Error("Prompt cannot be empty. Please provide a description of the image you want to generate.", title="Missing Input")
+        raise gr.Error("Prompt cannot be empty. Please provide a description of the image you want to generate.")
 
     processed_image = None
     # Process image inputs (uploaded or URL)
@@ -126,17 +133,25 @@ def generate_image(
             processed_image = url_to_pil(image_url)
             print(f"Successfully downloaded image from URL for model {model_name}")
         except Exception as e:
-            raise gr.Error(f"Failed to process image URL: {str(e)}", title="Image Processing Error")
+            raise gr.Error(f"Failed to process image URL: {str(e)}")
     elif model_name in IMAGE_INPUT_MODELS:
         # Warn if an image-expecting model is used without an image
         print(f"Note: Model {model_name} typically works better with an input image, but none was provided.")
         gr.Warning(f"Model {model_name} typically works better with an input image, but none was provided.")
     
     # Build API arguments
+    # Apply model-specific constraints
+    adjusted_steps = steps
+    if model_name in MODEL_CONSTRAINTS and "max_steps" in MODEL_CONSTRAINTS[model_name]:
+        max_steps = MODEL_CONSTRAINTS[model_name]["max_steps"]
+        if steps > max_steps:
+            print(f"Warning: Model {model_name} has a maximum of {max_steps} steps. Adjusting from {steps} to {max_steps}.")
+            adjusted_steps = max_steps
+            
     args = {
         "model": model_name,
         "prompt": prompt,
-        "steps": int(steps),
+        "steps": int(adjusted_steps),
         "n": int(num_outputs),
         "width": int(width),
         "height": int(height),
@@ -155,7 +170,7 @@ def generate_image(
             args["image_base64"] = pil_to_base64(processed_image)
         except Exception as e:
             print(f"Error encoding image: {str(e)}")
-            raise gr.Error(f"Error encoding image: {str(e)}", title="Image Processing Error")
+            raise gr.Error(f"Error encoding image: {str(e)}")
 
     # Handle safety checker logic
     if disable_safety and model_name not in MODELS_NO_SAFETY_DISABLE:
@@ -216,7 +231,7 @@ def generate_image(
                         print(f"Warning: No image data found for result {i}")
             
         if not images:
-            raise gr.Error("No images were returned from the API", title="Generation Failed")
+            raise gr.Error("No images were returned from the API")
             
         print(f"Successfully generated {len(images)} images.")
         # Return both the images and an updated count message
@@ -229,18 +244,19 @@ def generate_image(
         
         # Provide more helpful error messages based on common error patterns
         if "rate limit" in error_message.lower():
-            raise gr.Error("Rate limit exceeded. Please try again after a short wait.", title="API Rate Limit")
+            raise gr.Error("Rate limit exceeded. Please try again after a short wait.")
         elif "auth" in error_message.lower() or "key" in error_message.lower():
-            raise gr.Error("Authentication error. Please check your Together API key.", title="Authentication Error")
+            raise gr.Error("Authentication error. Please check your Together API key.")
         elif "timed out" in error_message.lower() or "timeout" in error_message.lower():
-            raise gr.Error("The request timed out. The Together API may be experiencing high traffic.", title="Timeout Error")
+            raise gr.Error("The request timed out. The Together API may be experiencing high traffic.")
         else:
-            raise gr.Error(f"Failed to generate image: {error_message}", title="Generation Failed")
+            # NOTE: Do not add 'title' parameter here - it will cause TypeErrors in Gradio 4.19.2
+            raise gr.Error(f"Failed to generate image: {error_message}")
 
 def suggest_prompt(theme: str):
     """Generates a prompt suggestion using Llama 4 Maverick."""
     if not client:
-        raise gr.Error("Together AI client not initialized. Check API Key.", title="Authentication Error")
+        raise gr.Error("Together AI client not initialized. Check API Key.")
     if not theme:
         return "" # Return empty if no theme provided
 
@@ -425,6 +441,12 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
                     value=AVAILABLE_MODELS[0], # Default to FLUX Pro
                     label="Select Model"
                 )
+                
+                # Add a dynamic steps slider update when model changes
+                def update_steps_slider(model_name):
+                    if model_name == "black-forest-labs/FLUX.1-schnell":
+                        return gr.update(maximum=12, value=min(12, steps_slider.value))
+                    return gr.update(maximum=50)
                 model_info = gr.Markdown(
                     MODEL_INFO[AVAILABLE_MODELS[0]]["description"],
                     elem_classes="model-info" 
@@ -449,7 +471,7 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
                 with gr.Row():
                     with gr.Column():
                         steps_slider = gr.Slider(
-                            minimum=1, maximum=50, step=1, value=20, 
+                            minimum=1, maximum=50, step=1, value=12, 
                             label="Steps"
                         )
                         cfg_slider = gr.Slider(
@@ -513,6 +535,13 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
         fn=update_model_info,
         inputs=[model_selector],
         outputs=[model_info]
+    )
+    
+    # Update steps slider based on model selection
+    model_selector.change(
+        fn=update_steps_slider,
+        inputs=[model_selector],
+        outputs=[steps_slider]
     )
     
     # Random example prompt
