@@ -1,3 +1,14 @@
+---
+title: FluxGradio
+emoji: 🖼️
+colorFrom: blue
+colorTo: purple
+sdk: gradio
+sdk_version: 4.19.2
+app_file: app.py
+pinned: false
+---
+
 # Flux Image Generator (via Together AI)
 
 This Gradio application provides an intuitive interface for generating images using various Black Forest Labs FLUX models hosted on the Together AI platform.
