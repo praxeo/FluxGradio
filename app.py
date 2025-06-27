@@ -410,18 +410,30 @@ def random_example():
 
 # --- Gradio UI ---
 css = """
-.gradio-container { 
-    font-family: 'IBM Plex Sans', sans-serif; 
+/* --- Base Container & Font --- */
+.gradio-container {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     max-width: 1200px;
     margin: auto;
 }
-.app-header { 
+
+/* --- FIX: Remove Italics & Improve Spacing for General Text --- */
+/* This targets all paragraphs and list items to ensure they are not italicized */
+.gradio-container p, .gradio-container li {
+    font-style: normal !important; /* The key to removing unwanted italics */
+    line-height: 1.6;              /* Increases space between lines for readability */
+    letter-spacing: 0.1px;         /* Adds subtle space between characters */
+}
+
+/* --- App Header Styling --- */
+.app-header {
     text-align: center;
     margin-bottom: 10px;
 }
 .app-title {
     color: #2c7be5;
     margin-bottom: 0px;
+    font-weight: 600; /* Make title a bit bolder */
 }
 .app-subtitle {
     margin-top: 0px;
@@ -432,44 +444,51 @@ css = """
     max-width: 900px;
     margin: 0 auto 20px auto;
     text-align: center;
+    font-size: 1.1em; /* Make the description text slightly larger */
 }
-.footer { 
-    text-align: center;
-    margin-top: 20px;
-    font-size: 0.9em;
-    color: #6c757d;
+
+/* --- General Component Styling --- */
+.gradio-group {
+    margin-bottom: 15px;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 .image-preview {
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
-.model-info {
+
+/* --- Model Info Styling --- */
+.model-info, .model-details {
     margin-top: 5px;
-    font-size: 0.85em;
-    font-style: italic;
-    color: #6c757d;
+    font-size: 0.9em;
+    color: #555; /* Darker text for better contrast */
 }
-footer { display: none !important; }
-.prompt-example-btn {
-    padding: 2px 8px;
-    margin: 2px;
-    border-radius: 4px;
-    font-size: 0.8em;
-}
+
+/* --- User Guide Styling --- */
 .guide-content {
     padding: 15px;
     background-color: #f8f9fa;
     border-radius: 8px;
     margin-bottom: 15px;
 }
-.guide-section {
-    margin-bottom: 15px;
+.guide-content li {
+    margin-bottom: 10px; /* IMPROVEMENT: Adds space between each bullet point */
 }
 .guide-heading {
     font-weight: bold;
     margin-bottom: 5px;
     color: #2c7be5;
 }
+
+/* --- Footer and Utility --- */
+.footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 0.9em;
+    color: #6c757d;
+}
+footer { display: none !important; } /* Hides the default Gradio footer */
 """
 
 # Define the Flux Model Guide content
@@ -507,9 +526,9 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
     with gr.Row():
         with gr.Column(scale=2):
             # Prompt Input section
-            with gr.Group():
+            with gr.Group(elem_classes="gradio-group"):
                 prompt_input = gr.Textbox(
-                    label="Prompt", 
+                    label="Prompt",
                     placeholder="Enter your image description here...",
                     lines=3
                 )
@@ -548,7 +567,7 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
                 suggestion_status = gr.Markdown("")
             
             # Model Selection section
-            with gr.Group():
+            with gr.Group(elem_classes="gradio-group"):
                 model_selector = gr.Dropdown(
                     choices=AVAILABLE_MODELS,
                     value=AVAILABLE_MODELS[0], # Default to FLUX Pro
@@ -574,7 +593,7 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
                 )
             
             # Image Input section
-            with gr.Group():
+            with gr.Group(elem_classes="gradio-group"):
                 with gr.Tab("Upload Image"):
                     input_image_upload = gr.Image(
                         type="pil", 

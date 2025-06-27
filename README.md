@@ -4,7 +4,7 @@ emoji: 🖼️
 colorFrom: blue
 colorTo: purple
 sdk: gradio
-sdk_version: 4.19.2
+sdk_version: 4.37.2
 app_file: app.py
 pinned: false
 ---
@@ -15,12 +15,12 @@ This Gradio application provides an intuitive interface for generating images us
 
 ## Features
 
-*   Supports multiple FLUX models: Pro, Schnell, Dev, Canny, Depth, Redux
+*   Supports multiple FLUX models: Pro, Schnell, Dev, Canny, Depth, Redux, Kontext, and Kontext-Max
 *   Text-to-Image generation with detailed prompt control
 *   Image-to-Image generation with specialized models
 *   Adjustable parameters: Steps, CFG Scale, Seed, Dimensions, Number of Outputs
 *   Optional safety checker disabling (where applicable)
-*   Prompt suggestion helper using DeepSeek V3 for higher-quality creative prompts
+*   Prompt suggestion helper using `deepseek-ai/DeepSeek-R1-0528-tput` for higher-quality creative prompts
 *   Comprehensive Flux Model Guide with usage tips and best practices
 *   Improved gallery display with support for multiple images (up to 4 columns)
 
@@ -111,6 +111,31 @@ Creates variations of input images while maintaining core elements.
 1. Upload a portrait photograph
 2. Prompt: "Reimagine this portrait in the style of a Renaissance oil painting with dramatic Rembrandt lighting, rich dark background, and warm color palette"
 
+#### FLUX.1-Kontext
+A fast image-to-image model that excels at understanding and replicating the visual context of a reference image. It's highly effective at capturing style, mood, and composition.
+
+**Best for:**
+- Style transfer
+- Character consistency
+- Generating variations that are visually harmonious with a source image
+- Rapid context-aware iterations (max 12 steps)
+
+**Example workflow:**
+1. Upload an image with a distinct artistic style (e.g., a Van Gogh painting)
+2. Prompt: "A modern cityscape at night, in the style of the reference image"
+
+#### FLUX.1-Kontext-Max
+A professional-grade version of Kontext for maximum quality and detail, supporting up to 50 inference steps.
+
+**Best for:**
+- High-fidelity style transfer
+- Detailed character replication
+- Complex context-aware generation tasks where quality is paramount
+
+**Example workflow:**
+1. Upload a detailed character portrait
+2. Prompt: "The same character, now wearing futuristic armor and standing on a spaceship bridge"
+
 ## Technical Implementation Notes
 
 ### Image-to-Image Processing
@@ -127,12 +152,12 @@ This ensures that the images are properly passed to the Together AI API in a for
 The application automatically handles model-specific constraints:
 
 - FLUX.1-schnell: Maximum of 12 inference steps
-- FLUX.1.1-pro and FLUX.1-schnell: Cannot disable safety filter
+- FLUX.1.1-pro, FLUX.1-schnell, FLUX.1-kontext, and FLUX.1-kontext-max: Cannot disable safety filter
 - All models: Dynamic resizing of large input images to prevent "Request Entity Too Large" errors
 
 ## Prompt Helper
 
-The application includes a powerful prompt suggestion feature powered by DeepSeek V3, a state-of-the-art language model. This helper can transform simple themes into detailed, effective prompts that produce better results with image generation models.
+The application includes a powerful prompt suggestion feature powered by `deepseek-ai/DeepSeek-R1-0528-tput`, a state-of-the-art language model. This helper can transform simple themes into detailed, effective prompts that produce better results with image generation models.
 
 **Example:**
 - Input theme: "underwater city"
