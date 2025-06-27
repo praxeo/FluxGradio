@@ -418,33 +418,22 @@ css = """
 }
 
 /* --- FIX: Remove Italics & Improve Spacing for General Text --- */
-/* This targets all paragraphs and list items to ensure they are not italicized */
 .gradio-container p, .gradio-container li {
-    font-style: normal !important; /* The key to removing unwanted italics */
-    line-height: 1.6;              /* Increases space between lines for readability */
-    letter-spacing: 0.1px;         /* Adds subtle space between characters */
+    font-style: normal !important;
+    line-height: 1.6;
+    letter-spacing: 0.1px;
 }
 
 /* --- App Header Styling --- */
-.app-header {
-    text-align: center;
-    margin-bottom: 10px;
-}
-.app-title {
-    color: #2c7be5;
-    margin-bottom: 0px;
-    font-weight: 600; /* Make title a bit bolder */
-}
-.app-subtitle {
-    margin-top: 0px;
-    color: #6c757d;
-}
+.app-header { text-align: center; margin-bottom: 10px; }
+.app-title { color: #2c7be5; margin-bottom: 0px; font-weight: 600; }
+.app-subtitle { margin-top: 0px; color: #6c757d; }
 .app-description {
     color: #4a5568;
     max-width: 900px;
     margin: 0 auto 20px auto;
     text-align: center;
-    font-size: 1.1em; /* Make the description text slightly larger */
+    font-size: 1.1em;
 }
 
 /* --- General Component Styling --- */
@@ -452,6 +441,7 @@ css = """
     margin-bottom: 15px;
     border-radius: 8px !important;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    padding: 15px !important; /* IMPROVEMENT: Added padding to all groups */
 }
 .image-preview {
     border-radius: 8px;
@@ -459,7 +449,7 @@ css = """
 }
 
 /* --- IMPROVEMENT: Add Padding to Textboxes --- */
-textarea[data-testid="textbox"] {
+textarea[data-testid="textbox"], input[type="text"] {
     padding: 10px !important;
     border-radius: 8px !important;
 }
@@ -468,7 +458,7 @@ textarea[data-testid="textbox"] {
 .model-info, .model-details {
     margin-top: 5px;
     font-size: 0.9em;
-    color: #555; /* Darker text for better contrast */
+    color: #555;
 }
 
 /* --- User Guide Styling --- */
@@ -476,25 +466,30 @@ textarea[data-testid="textbox"] {
     padding: 15px;
     background-color: #f8f9fa;
     border-radius: 8px;
-    margin-bottom: 15px;
 }
-.guide-content li {
-    margin-bottom: 10px; /* IMPROVEMENT: Adds space between each bullet point */
-}
-.guide-heading {
-    font-weight: bold;
-    margin-bottom: 5px;
-    color: #2c7be5;
-}
+.guide-content li { margin-bottom: 10px; }
+.guide-heading { font-weight: bold; margin-bottom: 5px; color: #2c7be5; }
 
 /* --- Footer and Utility --- */
-.footer {
-    text-align: center;
-    margin-top: 20px;
-    font-size: 0.9em;
-    color: #6c757d;
+.footer { text-align: center; margin-top: 20px; font-size: 0.9em; color: #6c757d; }
+footer { display: none !important; }
+
+/* --- MOBILE RESPONSIVENESS --- */
+@media (max-width: 768px) {
+    .gradio-container {
+        padding: 10px;
+    }
+    .gradio-group {
+        padding: 10px !important;
+    }
+    .app-title { font-size: 2em; }
+    .app-description { font-size: 1em; }
+    
+    /* Force columns to stack on mobile */
+    .gradio-row {
+        flex-direction: column !important;
+    }
 }
-footer { display: none !important; } /* Hides the default Gradio footer */
 """
 
 # Define the Flux Model Guide content
@@ -526,8 +521,8 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
     )
     
     # Add Flux Model Guide
-    with gr.Accordion("📚 Flux Model Guide", open=False):
-        gr.Markdown(FLUX_GUIDE_CONTENT, elem_classes="guide-content")
+    with gr.Accordion("📚 Flux Model Guide", open=True):
+        gr.Markdown(FLUX_GUIDE_CONTENT)
 
     with gr.Row():
         with gr.Column(scale=2):
@@ -540,7 +535,6 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
                 )
                 
                 with gr.Row():
-                    example_btn = gr.Button("Get Example Prompt", size="sm")
                     clear_btn = gr.Button("Clear", size="sm")
                 
                 negative_prompt_input = gr.Textbox(
@@ -616,7 +610,7 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
                     )
 
             # Advanced Settings section
-            with gr.Accordion("Advanced Settings", open=False):
+            with gr.Accordion("Advanced Settings", open=True):
                 with gr.Row():
                     with gr.Column():
                         steps_slider = gr.Slider(
@@ -693,13 +687,6 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
         outputs=[steps_slider]
     )
     
-    # Random example prompt
-    example_btn.click(
-        fn=random_example,
-        inputs=[],
-        outputs=[prompt_input]
-    )
-    
     # Clear prompt
     clear_btn.click(
         fn=lambda: "",
@@ -750,6 +737,16 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
         fn=lambda: ("", "", ""),
         inputs=[],
         outputs=[prompt_theme_input, suggested_prompt_output, suggestion_status]
+    )
+
+    # Iterative Refinement: Use gallery image as input
+    def set_image_for_refinement(evt: gr.SelectData):
+        """Takes the selected image from the gallery and sets it as the input image."""
+        return evt.value
+
+    output_gallery.select(
+        fn=set_image_for_refinement,
+        outputs=[input_image_upload]
     )
     
     # Footer
