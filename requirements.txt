@@ -1,5 +1,7 @@
-gradio==4.19.2
-together>=0.1.5
+gradio>=4.37.2
+together>=1.1.2
 pillow>=9.0.0
 requests>=2.27.0
 python-dotenv>=0.19.0
+beautifulsoup4>=4.12.3
+lxml>=5.2.2

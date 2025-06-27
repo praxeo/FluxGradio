@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+
+load_dotenv()
 import gradio as gr
 import together
 import os
@@ -9,6 +12,7 @@ from PIL import Image
 import datetime
 import random
 from typing import Optional
+from bs4 import BeautifulSoup
 
 # --- Configuration ---
 # Initialize the Together client
@@ -24,60 +28,84 @@ except Exception as e:
 # Models that do not support disabling the safety checker
 MODELS_NO_SAFETY_DISABLE = [
     "black-forest-labs/FLUX.1-schnell",
-    "black-forest-labs/FLUX.1.1-pro"
+    "black-forest-labs/FLUX.1.1-pro",
+    "black-forest-labs/FLUX.1-kontext",
+    "black-forest-labs/FLUX.1-kontext-max"
 ]
 
 # Model-specific constraints
 MODEL_CONSTRAINTS = {
     "black-forest-labs/FLUX.1-schnell": {
         "max_steps": 12
+    },
+    "black-forest-labs/FLUX.1-kontext": {
+        "max_steps": 12
+    },
+    "black-forest-labs/FLUX.1-kontext-max": {
+        "max_steps": 50
     }
 }
 
 # Models that typically expect an input image
 IMAGE_INPUT_MODELS = [
     "black-forest-labs/FLUX.1-canny",
-    "black-forest-labs/FLUX.1-depth", 
-    "black-forest-labs/FLUX.1-redux"
+    "black-forest-labs/FLUX.1-depth",
+    "black-forest-labs/FLUX.1-redux",
+    "black-forest-labs/FLUX.1-kontext",
+    "black-forest-labs/FLUX.1-kontext-max"
 ]
 
 # List of available models with descriptions
 MODEL_INFO = {
     "black-forest-labs/FLUX.1.1-pro": {
         "description": "Premium high-quality generation model for photorealistic and artistic images",
-        "details": """FLUX.1.1-Pro is Black Forest Labs' flagship model, designed for maximum image quality and detail. 
-        It excels at photorealism, complex scenes, and accurate representations of subjects. Best for portfolio-quality 
+        "details": """FLUX.1.1-Pro is Black Forest Labs' flagship model, designed for maximum image quality and detail.
+        It excels at photorealism, complex scenes, and accurate representations of subjects. Best for portfolio-quality
         images when quality is more important than generation speed. Supports up to 50 inference steps."""
     },
     "black-forest-labs/FLUX.1-schnell": {
         "description": "Fast generation model with good quality - ideal for rapid iterations",
-        "details": """FLUX.1-Schnell (German for 'fast') is optimized for speed while maintaining respectable image quality. 
-        It's perfect for quickly testing concepts or when you need multiple variations in less time. Limited to a maximum of 
+        "details": """FLUX.1-Schnell (German for 'fast') is optimized for speed while maintaining respectable image quality.
+        It's perfect for quickly testing concepts or when you need multiple variations in less time. Limited to a maximum of
         12 inference steps, it generates images significantly faster than other models in the FLUX family."""
-    }, 
+    },
     "black-forest-labs/FLUX.1-dev": {
         "description": "Development model offering a well-balanced mix of quality and speed",
-        "details": """FLUX.1-Dev provides a middle ground between the Pro and Schnell models. It offers a good balance of 
-        generation quality and speed, making it suitable for everyday use and development work. It handles a wide range of 
+        "details": """FLUX.1-Dev provides a middle ground between the Pro and Schnell models. It offers a good balance of
+        generation quality and speed, making it suitable for everyday use and development work. It handles a wide range of
         prompts reliably and supports safety filter disabling for artistic freedom."""
     },
     "black-forest-labs/FLUX.1-canny": {
         "description": "Uses edge detection for precise composition and structure control",
-        "details": """FLUX.1-Canny is an image-to-image model that preserves the structural outlines of your reference image. 
-        It works by detecting edges in your uploaded image and using them as a skeleton for the new creation. Perfect for 
+        "details": """FLUX.1-Canny is an image-to-image model that preserves the structural outlines of your reference image.
+        It works by detecting edges in your uploaded image and using them as a skeleton for the new creation. Perfect for
         maintaining exact poses, compositions, or converting sketches and line drawings into fully rendered images."""
     },
     "black-forest-labs/FLUX.1-depth": {
         "description": "Uses depth maps for accurate spatial relationships and 3D consistency",
-        "details": """FLUX.1-Depth extracts depth information from your reference image to maintain the spatial layout and 
-        perspective in the generated image. It's ideal for preserving the 3D structure of scenes while changing their style, 
+        "details": """FLUX.1-Depth extracts depth information from your reference image to maintain the spatial layout and
+        perspective in the generated image. It's ideal for preserving the 3D structure of scenes while changing their style,
         materials, or theme. Excellent for architectural visualization, interior design transformations, or landscape restyling."""
     },
     "black-forest-labs/FLUX.1-redux": {
         "description": "Creates variations of input images while maintaining core elements",
-        "details": """FLUX.1-Redux specializes in creating alternative interpretations of your reference images. It maintains 
-        the essential elements and composition while allowing for creative reinterpretation based on your prompt. Perfect for 
+        "details": """FLUX.1-Redux specializes in creating alternative interpretations of your reference images. It maintains
+        the essential elements and composition while allowing for creative reinterpretation based on your prompt. Perfect for
         exploring different artistic styles, lighting conditions, or mood variations of an existing image."""
+    },
+    "black-forest-labs/FLUX.1-kontext": {
+        "description": "A fast image-to-image model that excels at understanding visual context",
+        "details": """FLUX.1-Kontext is a specialized image-to-image model designed to understand and replicate the visual
+        context of a reference image. It's highly effective at capturing the style, mood, and composition of the input,
+        making it ideal for tasks like style transfer, character consistency, or generating variations that are visually
+        harmonious with the source. It operates with a maximum of 12 inference steps for rapid results."""
+    },
+    "black-forest-labs/FLUX.1-kontext-max": {
+        "description": "A professional-grade version of Kontext for maximum quality and detail",
+        "details": """FLUX.1-Kontext-Max offers the same powerful visual context understanding as the base Kontext model but
+        is designed for higher fidelity and more detailed outputs. It supports up to 50 inference steps, allowing for
+        more refined and intricate results. Use this model when you need the absolute best quality for style transfer,
+        character replication, or other context-aware generation tasks."""
     }
 }
 
@@ -308,39 +336,73 @@ def generate_image(
             # NOTE: Do not add 'title' parameter here - it will cause TypeErrors in Gradio 4.19.2
             raise gr.Error(f"Failed to generate image: {error_message}")
 
-def suggest_prompt(theme: str):
-    """Generates a prompt suggestion using DeepSeek V3."""
+def suggest_prompt(theme: str, progress=gr.Progress(track_tqdm=True)):
+    """Generates a prompt suggestion using a powerful LLM."""
     if not client:
         raise gr.Error("Together AI client not initialized. Check API Key.")
     if not theme:
-        return "" # Return empty if no theme provided
+        return "", ""
 
+    progress(0.1, desc="Sending request to LLM for prompt suggestion...")
     print(f"Suggesting prompt for theme: {theme}")
+
     try:
+        # Use a more advanced model for higher quality suggestions
         response = client.chat.completions.create(
-            model="deepseek-ai/DeepSeek-V3",
+            model="deepseek-ai/DeepSeek-R1-0528-tput",
             messages=[
-                {"role": "system", "content": "You are an expert at creating stunning, evocative image generation prompts. Your specialty is crafting prompts that produce vivid, beautiful, and compelling images when fed to AI image generators. Focus on visual elements: subjects, lighting, colors, mood, composition, style, and artistic influences. Be creative, detailed, and articulate. Your prompts should paint a clear picture in the reader's mind."},
-                {"role": "user", "content": f"Create a detailed, artistic prompt for an AI image generator based on this theme: {theme}. Include visual details, style references, lighting, and composition guidance."}
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a world-class expert in crafting artistic and effective prompts for AI image generators. "
+                        "Your task is to take a user's simple theme or idea and transform it into a rich, detailed, and "
+                        "evocative prompt. The prompt should be a single, continuous block of text, not a list. "
+                        "Focus on sensory details, composition, lighting, artistic style, and mood. "
+                        "For example, if the user says 'a cat in a library', you might create: "
+                        "'A photorealistic image of a fluffy ginger cat sleeping peacefully on a pile of old, leather-bound books. "
+                        "Sunlight streams through a dusty library window, illuminating the scene with a warm, golden glow. "
+                        "The style should be cozy and academic, with a shallow depth of field focusing on the cat. "
+                        "The mood is tranquil and serene.'"
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Based on this theme, create a single, detailed, and artistic prompt for an AI image generator: '{theme}'"
+                }
             ],
-            max_tokens=300, # Increased token limit for more detailed prompts
-            temperature=0.8, # Slightly reduced for more focused creativity
+            max_tokens=400,
+            temperature=0.75,
+            repetition_penalty=1.05,
         )
+        
+        progress(0.8, desc="Processing LLM response...")
+        
         suggestion = response.choices[0].message.content.strip()
-        print(f"Generated suggestion: {suggestion}")
-        return suggestion
+        
+        # Clean up the suggestion if it includes conversational text
+        # For example, removing "Here is a prompt:" from the beginning
+        cleaned_suggestion = re.sub(r'^(Here is a detailed prompt based on your theme:|Here is a prompt:|Sure, here is a prompt for you:)\s*', '', suggestion, flags=re.IGNORECASE)
+        
+        # Further clean up by removing markdown quotes if present
+        cleaned_suggestion = cleaned_suggestion.replace('"', '')
+
+        print(f"Generated suggestion: {cleaned_suggestion}")
+        
+        # Return the suggestion and a confirmation message
+        return cleaned_suggestion, f"Suggestion for '{theme}' created successfully."
+
     except Exception as e:
         error_message = str(e)
         print(f"Error suggesting prompt: {error_message}")
         
         if "rate limit" in error_message.lower():
-            gr.Warning("Rate limit exceeded. Please try again later.")
+            gr.Warning("Rate limit exceeded for prompt suggestion. Please try again later.")
         elif "auth" in error_message.lower() or "key" in error_message.lower():
-            gr.Warning("Authentication error with the LLM service.")
+            gr.Warning("Authentication error with the LLM service for prompt suggestion.")
         else:
             gr.Warning(f"Could not suggest prompt: {error_message}")
         
-        return "" # Return empty on error
+        return "", "Failed to generate suggestion."
 
 def random_example():
     """Returns a random example prompt."""
@@ -412,33 +474,19 @@ footer { display: none !important; }
 
 # Define the Flux Model Guide content
 FLUX_GUIDE_CONTENT = """
-## Flux Model Guide – Quick Start
+### How to Use This App
+1.  **Select a Model**: Choose a model from the dropdown. Each model has unique strengths. Check the model details below the selector for more info.
+2.  **Write a Prompt**: Describe the image you want to create. Be descriptive! Use the **Prompt Helper** if you need ideas.
+3.  **(Optional) Add an Input Image**: For models like Canny, Depth, or Kontext, upload an image or provide a URL to guide the generation.
+4.  **Adjust Settings**: Fine-tune parameters like steps, guidance scale (CFG), and image dimensions in the **Advanced Settings**.
+5.  **Generate**: Click the "Generate Image" button and see your creation!
 
-### Model Overview
-**Flux 1.1 Pro** is a high-quality general-purpose text-to-image model. It generates detailed, aesthetically pleasing images from prompts without needing any reference images. It's ideal for creating everything from product photos and fantasy art to landscapes and portraits based purely on your imagination.
-
-**Flux Redux** is a variation of Flux 1.1 Pro. It also uses text-to-image generation but is tuned differently. Think of it as offering a different visual "taste" or creative style. You may notice it handles composition, lighting, or faces a bit differently. Use Redux when you want variation in the aesthetic or when Flux Pro isn't quite hitting the vibe you want.
-
-**Flux Depth** is an image-to-image model that uses a depth map extracted from a reference image to understand and preserve the 3D structure and spatial layout of the scene. You still provide a prompt, but the model uses the depth information to guide the composition. It's great for scenarios where you want to restyle an image while keeping the layout intact.
-
-**Flux Canny** is another image-to-image model, but instead of depth, it uses Canny edge detection to preserve the outlines and structure of your source image. It works best with clear shapes like sketches, drawings, or strong pose references. Flux Canny is ideal when you care about the silhouette or positioning of objects.
-
-### Prompting Tips
-Prompts should be specific but not overly long. For example, "a cozy cabin at night, snow falling, warm lights, cinematic lighting" works well. You can include stylistic cues like "in the style of Studio Ghibli", "oil painting", or "cyberpunk environment". Use lighting terms like "dramatic rim light" or "soft ambient glow" to control mood. Camera terms such as "wide shot", "portrait", or "overhead angle" help shape composition.
-
-Negative prompts are optional but helpful. For example, "no blur, no watermark, no extra limbs" can improve output quality.
-
-### Parameters Explained
-**Seed values** control randomness. The same seed with the same prompt will generate the same image. Changing the seed will produce different variations.
-
-**Guidance Scale (CFG)** controls how closely the model follows your prompt. Higher values (6–10) = more literal.
-
-**Steps** is the number of refinement iterations. 20–30 is a good range. More steps = better quality but longer time.
-
-### Usage Summary
-- Use **Flux 1.1 Pro or Redux** when you just want to generate from text
-- Use **Flux Depth** when you want to preserve the 3D layout of a scene but change the style
-- Use **Flux Canny** when you care more about preserving shapes, outlines, or poses from a sketch or image
+### Prompting Best Practices
+-   **Be Specific**: Instead of "a dog", try "A fluffy golden retriever puppy playing in a field of wildflowers, morning light".
+-   **Use Adjectives**: Words like "serene", "vibrant", "dramatic", "minimalist" help set the mood.
+-   **Mention Style**: Include phrases like "in the style of a watercolor painting", "photorealistic", "cyberpunk concept art", or "Studio Ghibli animation".
+-   **Control the Camera**: Use terms like "wide-angle shot", "close-up portrait", "from a low angle" to control composition.
+-   **Use Negative Prompts**: Add things you want to avoid, like "blurry, deformed hands, watermark, text".
 """
 
 with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hue="sky")) as demo:
@@ -477,17 +525,27 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
                 )
             
             # Prompt Helper section
-            with gr.Accordion("Prompt Helper (DeepSeek V3)", open=False):
-                prompt_theme_input = gr.Textbox(
-                    label="Prompt Idea/Theme", 
-                    placeholder="e.g., 'cyberpunk cat cafe', 'underwater city', 'desert oasis'"
-                )
-                suggest_button = gr.Button("Suggest Detailed Prompt", variant="secondary")
-                suggested_prompt_output = gr.Textbox(
-                    label="Suggested Prompt", 
-                    interactive=True,
-                    lines=4
-                )
+            with gr.Accordion("🚀 Prompt Helper (DeepSeek R1)", open=False):
+                with gr.Column():
+                    prompt_theme_input = gr.Textbox(
+                        label="Prompt Idea / Theme",
+                        placeholder="e.g., 'a cat in a library', 'a futuristic city at night', 'enchanted forest'",
+                        lines=2
+                    )
+                    suggest_button = gr.Button("✨ Generate a Better Prompt", variant="secondary")
+                    
+                    suggested_prompt_output = gr.Textbox(
+                        label="Suggested Prompt",
+                        interactive=True,
+                        lines=4,
+                        placeholder="Your improved prompt will appear here..."
+                    )
+                    
+                    with gr.Row():
+                        use_suggestion_btn = gr.Button("⬇️ Use This Suggestion", size="sm")
+                        clear_suggestion_btn = gr.Button("🗑️ Clear Suggestion", size="sm")
+                
+                suggestion_status = gr.Markdown("")
             
             # Model Selection section
             with gr.Group():
@@ -498,17 +556,21 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
                 )
                 
                 # Add a dynamic steps slider update when model changes
-                def update_steps_slider(model_name):
-                    if model_name == "black-forest-labs/FLUX.1-schnell":
-                        return gr.update(maximum=12, value=min(12, steps_slider.value))
-                    return gr.update(maximum=50)
+                def update_steps_slider(model_name, current_steps):
+                    max_steps = 50
+                    if model_name in MODEL_CONSTRAINTS and "max_steps" in MODEL_CONSTRAINTS[model_name]:
+                        max_steps = MODEL_CONSTRAINTS[model_name]["max_steps"]
+                    
+                    # Adjust current value if it exceeds the new maximum
+                    new_value = min(int(current_steps), max_steps)
+                    
+                    return gr.update(maximum=max_steps, value=new_value)
                 model_info = gr.Markdown(
                     MODEL_INFO[AVAILABLE_MODELS[0]]["description"],
                     elem_classes="model-info" 
                 )
                 model_details = gr.Markdown(
-                    MODEL_INFO[AVAILABLE_MODELS[0]]["details"],
-                    elem_classes="guide-content" 
+                    MODEL_INFO[AVAILABLE_MODELS[0]]["details"]
                 )
             
             # Image Input section
@@ -599,7 +661,7 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
     # Update steps slider based on model selection
     model_selector.change(
         fn=update_steps_slider,
-        inputs=[model_selector],
+        inputs=[model_selector, steps_slider],
         outputs=[steps_slider]
     )
     
@@ -641,24 +703,25 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
     suggest_button.click(
         fn=suggest_prompt,
         inputs=[prompt_theme_input],
-        outputs=[suggested_prompt_output]
+        outputs=[suggested_prompt_output, suggestion_status]
     )
-    
+
     # Use suggested prompt
     def use_suggestion(suggestion):
-        """Use the suggested prompt."""
-        if suggestion:
-            return suggestion
-        return ""
-        
-    # Add button to use the suggested prompt
-    with gr.Accordion("Prompt Helper (DeepSeek V3)", open=False) as prompt_helper:
-        use_suggestion_btn = gr.Button("Use This Suggestion", variant="secondary", size="sm")
-        
+        """Copies the suggested prompt to the main prompt input."""
+        return suggestion
+
     use_suggestion_btn.click(
         fn=use_suggestion,
         inputs=[suggested_prompt_output],
         outputs=[prompt_input]
+    )
+
+    # Clear suggestion
+    clear_suggestion_btn.click(
+        fn=lambda: ("", "", ""),
+        inputs=[],
+        outputs=[prompt_theme_input, suggested_prompt_output, suggestion_status]
     )
     
     # Footer
