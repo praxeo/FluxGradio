@@ -771,4 +771,4 @@ if __name__ == "__main__":
          error_demo.launch()
     else:
         print("Launching Gradio Interface...")
-        demo.launch(share=True)
+        demo.launch()
