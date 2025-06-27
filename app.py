@@ -458,6 +458,12 @@ css = """
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
+/* --- IMPROVEMENT: Add Padding to Textboxes --- */
+textarea[data-testid="textbox"] {
+    padding: 10px !important;
+    border-radius: 8px !important;
+}
+
 /* --- Model Info Styling --- */
 .model-info, .model-details {
     margin-top: 5px;
@@ -540,7 +546,8 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
                 negative_prompt_input = gr.Textbox(
                     label="Negative Prompt", 
                     placeholder="Enter elements to avoid in the image...",
-                    lines=2
+                    lines=2,
+                    elem_classes="textbox-padding"
                 )
             
             # Prompt Helper section
@@ -549,7 +556,8 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
                     prompt_theme_input = gr.Textbox(
                         label="Prompt Idea / Theme",
                         placeholder="e.g., 'a cat in a library', 'a futuristic city at night', 'enchanted forest'",
-                        lines=2
+                        lines=2,
+                        elem_classes="textbox-padding"
                     )
                     suggest_button = gr.Button("✨ Generate a Better Prompt", variant="secondary")
                     
@@ -557,7 +565,8 @@ with gr.Blocks(css=css, theme=gr.themes.Default(primary_hue="blue", secondary_hu
                         label="Suggested Prompt",
                         interactive=True,
                         lines=4,
-                        placeholder="Your improved prompt will appear here..."
+                        placeholder="Your improved prompt will appear here...",
+                        elem_classes="textbox-padding"
                     )
                     
                     with gr.Row():
